@@ -1,5 +1,6 @@
 import RepoResultRow from '@/components/home/RepoResultRow';
 import { octokit } from '@/utils/octokit';
+import { useQuery } from '@tanstack/react-query';
 import { createLazyFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 
@@ -14,22 +15,34 @@ type RepoResult = {
 
 function Index() {
   const [searchValue, setSearchValue] = useState('');
+  let queryVal = '';
 
-  const [searchResults, setSearchResults] = useState([] as RepoResult[]);
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['searchRepos', queryVal],
+    queryFn: async () => {
+      console.log(`queryVal: ${queryVal}`);
+      const result = await octokit.rest.search.repos({
+        q: queryVal,
+        sort: 'stars',
+        order: 'desc',
+        per_page: 20,
+      });
+
+      return result.data.items as RepoResult[];
+    },
+    enabled: false,
+    refetchOnWindowFocus: false,
+  });
 
   const handleClick = async () => {
-    const result = await octokit.rest.search.repos({
-      q: searchValue,
-      sort: 'stars',
-      order: 'desc',
-      per_page: 20,
-    });
-
-    setSearchResults(result.data.items);
+    queryVal = searchValue;
+    refetch();
   };
 
-  const searchResultRows = searchResults.map((res) =>
-    RepoResultRow({ name: res.name })
+  const searchResultRows = isLoading ? (
+    <p>Loading...</p>
+  ) : (
+    (data ?? []).map((res) => RepoResultRow({ name: res.name, id: res.id }))
   );
 
   return (
